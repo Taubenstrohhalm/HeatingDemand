@@ -57,25 +57,33 @@ temp_ground = 8 # °C # some formula needed to calc ground temp, from ambient te
 
 #%% TRANSMISSION LOSSES
 df_trans = pd.DataFrame() # create df for all the transmission heatflows
-# transmission losses for all opaque building planes
+# Opaque building elements (basement, outside walls, roof)
 for wall, property in walls.items():
     if wall == 'basement':
         # The basement walls outside temperature is the ground temperature
-        df_trans['Qdot_trans_basement [W]'] =  heatflow_transmission(area = property['area'], 
-                                          u_value = property['u_value'],
-                                          temp_in = temp_in_low, 
-                                          temp_out = temp_ground)
+        df_trans['Qdot_trans_basement [W]'] =  heatflow_transmission(
+            area = property['area'], 
+            u_value = property['u_value'],
+            temp_in = temp_in_low, 
+            temp_out = temp_ground,
+        )
     else:
         # All other walls have the ambient air temperature as outside temperature
         df_trans['Qdot_trans_' + wall + ' [W]'] = heatflow_transmission(
-                                        u_value = property['u_value'],
-                                        area = property['area'],
-                                        temp_in = temp_in_low,
-                                        temp_out = df['T2m'])
+            u_value = property['u_value'],
+            area = property['area'],
+            temp_in = temp_in_low,
+            temp_out = df['T2m'],
+        )
 
-# transmission losses for all transparent building planes
+# Transparent building elements (windows)
 for window, properties in windows.items():
-    pass
+    df_trans['Qdot_trans_win_' + window + ' [W]'] = heatflow_transmission(
+        u_value=properties['u_value'],
+        area=properties['area'],
+        temp_in=temp_in_low,
+        temp_out=df['T2m'],
+    )
 print(df_trans.head())
 '''
 # %% SOLAR GAINS
