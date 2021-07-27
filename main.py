@@ -8,14 +8,14 @@ Created on Tue May 25 10:11:00 2021
 import pandas as pd
 
 from utilities import get_tmy_data
-from physics import heatflow_transmission
+from physics import heatflow_transmission, heatflow_ventilation_infiltration
 
 #%% COMFORT LEVELS 
 
 temp_in_low = 20 # [°C] lowest allowed temperature, if temperature drops below this level, heating is required
 temp_in_high = 26 # [°C] highest allowed temperature, if temperature goes above this level, cooling is required
-n_ventilation = 0.5 # [1/h] ventilation rate, _ air exchanges per hour
-n_infiltration = 0.5 # [1/h] infiltration rate, _ air exchanges per hour
+n_ventilation = 0.25 # [1/h] ventilation rate, _ air exchanges per hour
+n_infiltration = 0.25 # [1/h] infiltration rate, _ air exchanges per hour
 
 #%% BUILDING INFORMATION, GEOMETRY AND MATERIAL PROPERTIES
 
@@ -57,6 +57,7 @@ temp_ground = 8 # °C # some formula needed to calc ground temp, from ambient te
 
 #%% TRANSMISSION LOSSES
 df_trans = pd.DataFrame() # create df for all the transmission heatflows
+df['Qdot_trans_opaque [W]'] = 0 # create empty column in main df for sum of opaque trans heatflows 
 # Opaque building elements (basement, outside walls, roof)
 for wall, property in walls.items():
     if wall == 'basement':
@@ -75,8 +76,9 @@ for wall, property in walls.items():
             temp_in = temp_in_low,
             temp_out = df['T2m'],
         )
-
+    df['Qdot_trans_opaque [W]'] += df_trans['Qdot_trans_' + wall + ' [W]']
 # Transparent building elements (windows)
+df['Qdot_trans_windows [W]'] = 0 # create empty column in main df for sum of window trans heatflows
 for window, properties in windows.items():
     df_trans['Qdot_trans_win_' + window + ' [W]'] = heatflow_transmission(
         u_value=properties['u_value'],
@@ -84,7 +86,22 @@ for window, properties in windows.items():
         temp_in=temp_in_low,
         temp_out=df['T2m'],
     )
+    df['Qdot_trans_windows [W]'] += df_trans['Qdot_trans_win_' + window + ' [W]']
 print(df_trans.head())
+
+
+#%% calculate heatflow due to infiltration and ventilation
+
+df['Qdot_vent [W]'] = heatflow_ventilation_infiltration(
+    volume = volume,
+    n_vent = n_ventilation,
+    n_inf = n_infiltration,
+    temp_in = temp_in_low,
+    temp_out = df['T2m']
+)
+
+
+print(df.head())
 '''
 # %% SOLAR GAINS
 
@@ -116,13 +133,5 @@ for window, property in windows.items():
     Qdot_win = heatflow_solar_gains(property['area'], irradiation['window'], property['g_value'])
     print(f'{window=}: {Qdot_win=}')
 
-
-#%% calculate heatflow due to infiltration and ventilation
-
-def heatflow_ventilation_infiltration(volume, n_vent, n_inf, temp_in, temp_out):
-    HEATCAPAIR = 1100 # [J/kg] heat capacity of air
-    DENSITYAIR = 1.25 # [kg/m^3] density of air
-    Qdot = HEATCAPAIR * DENSITYAIR * volume * (n_inf + n_vent) * (temp_in - temp_out)
-    return Qdot
 
 '''
