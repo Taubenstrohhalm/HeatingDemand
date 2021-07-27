@@ -3,7 +3,6 @@ import json
 import pandas as pd
 from pathlib import Path
 
-data_path = Path("input")
 
 def get_tmy_data(latitude, longitude):
     """Load weather - typical meterological year(TMY) data from PVGIS
@@ -21,7 +20,7 @@ def get_tmy_data(latitude, longitude):
     response = requests.get(url)
     return response.content
 
-def save_tmy_data(data, filename, filepath = data_path):
+def save_tmy_data(data, filename, filepath):
     """Save the weather data in a json file.
     Parameters
     ----------
@@ -32,10 +31,10 @@ def save_tmy_data(data, filename, filepath = data_path):
     filepath : pathlib Path
         filepath where the json file should be saved
     """
-    Path(filepath , filename + ".json").write_bytes(data)
+    Path(filepath , filename).write_bytes(data)
 
 
-def read_tmy_data(filename, filepath = data_path):
+def read_tmy_data(filename, filepath):
     """Read the weather data from a json file and write to pandas dataframe.
     Parameters
     ----------
@@ -48,14 +47,9 @@ def read_tmy_data(filename, filepath = data_path):
     pandas df containing
     - time (index, datetime): Date & time (UTC)
     - T2m (pandas column, float): Dry bulb (air) temperature [°C]
-    - RH (pandas column, float):  Relative Humidity [%]
     - G(h) (pandas column, float): Global horizontal irradiance [W/m2]
     - Gb(n) (pandas column, float): Direct (beam) irradiance [W/m2]
     - Gd(h) (pandas column, float): Diffuse horizontal irradiance [W/m2]
-    - IR(h) (pandas column, float): Infrared radiation downwards [W/m2]
-    - WS10m (pandas column, float): Windspeed [m/s]
-    - WD10m (pandas column, float): Wind direction [°]
-    - SP (pandas column, float): Surface (air) pressure [Pa]
     Notes
     -----
     A typical meteorological year (TMY) is a set of meteorological data with data values 
@@ -67,11 +61,11 @@ def read_tmy_data(filename, filepath = data_path):
     .. [1] https://ec.europa.eu/jrc/en/PVGIS/tools/tmy
     """
 
-    filename = Path(filepath , filename + ".json")
+    filename = Path(filepath , filename)
     with open(filename, 'r') as file:
         data = json.load(file)
     data_outputs_hourly = data['outputs']['tmy_hourly']
     df = pd.DataFrame.from_dict(data_outputs_hourly)
     df.set_index('time(UTC)', inplace = True)
     df.index = pd.to_datetime(df.index, format = '%Y%m%d:%H%M')
-    return df
+    return df[['T2m','G(h)','Gb(n)','Gd(h)']]

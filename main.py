@@ -4,14 +4,16 @@ Created on Tue May 25 10:11:00 2021
 
 @author: Lukas
 """
-
+import os
 import pandas as pd
+from pathlib import Path
 from pvlib.solarposition import get_solarposition
 from pvlib.irradiance import get_total_irradiance
 
 import utilities
-#from utilities import get_tmy_data
 from physics import heatflow_transmission, heatflow_ventilation_infiltration, heatflow_solar_gains
+
+input_datapath = Path("input")
 
 #%% COMFORT LEVELS 
 
@@ -45,19 +47,36 @@ windows = {
     'west' : {'area' : 2, 'u_value' : 2, 'g_value' : 0.6, 'tilt' : 90, 'azimuth' : 270},
 }
 
-# %% LOAD WEATHER DATA - tmy for now
+# %% LOAD AND PREPARE ENVIRONMENT (WEATHER) DATA - tmy for now
 
-# timezone information is needed for the calculation of sun angles by pvlib
-tz = 'Europe/Berlin' # maybe the timezone can be set according to lat, long
+# If there is no weather data for the given location in the input directory download it
+tmy_filename = f'TMY_lat{latitude}_lon{longitude}.json'
+if not os.path.isfile(Path(input_datapath , tmy_filename)):
+    print(f'Downloading TMY data for latitude: {latitude}, longitude: {longitude}')
+    data = utilities.get_tmy_data(latitude=latitude, longitude=longitude)
+    utilities.save_tmy_data(data, tmy_filename, input_datapath)
 
-#data = utilities.get_tmy_data(latitude=latitude, longitude=longitude)
-#utilities.save_tmy_data(data, f"TMY_lat{latitude}_lon{longitude}")
-df = utilities.read_tmy_data(filename=f"TMY_lat{latitude}_lon{longitude}")[['T2m','G(h)','Gb(n)','Gd(h)']]
-print(df.head())
+df_env = utilities.read_tmy_data(tmy_filename, input_datapath)
 
-# temp_out = 10 # °C
-temp_ground = 8 # °C # some formula needed to calc ground temp, from ambient temp
+column_names = {
+    'T2m':'T_amb [°C]', # Ambient air temperature [°C]
+    'G(h)': 'G(h) [W/m^2]', # Global horizontal irradiance [W/m^2]
+    'Gb(n)': 'Gb(n) [W/m^2]', # Normal beam irradiance [W/m^2]
+    'Gd(h)': 'Gd(h) [W/m^2]', # Diffuse horizontal irradiance [W/m^2]
+}
 
+df_env.rename(columns=column_names, inplace=True)
+
+# Add (constant ground) temperature to dataframe - TODO calc ground temp, from ambient temp
+temp_ground = 8 # Ground temperature °C # 
+df_env['TGround [°C]'] = temp_ground
+
+# Add solar angles for every hour to the dataframe - needed for calc of solar gains
+df_env[['Sun zenith [deg]','Sun azimuth [deg]']] = get_solarposition(df_env.index, latitude, longitude)[['zenith','azimuth']]
+
+print(df_env.head())
+
+'''
 #%% TRANSMISSION LOSSES
 df_trans = pd.DataFrame() # create df for all the transmission heatflows
 df['Qdot_trans_opaque [W]'] = 0 # create empty column in main df for sum of opaque trans heatflows 
@@ -131,3 +150,4 @@ for window, properties in windows.items():
 
 print(df_sol.head())
 print(df.head())
+'''
