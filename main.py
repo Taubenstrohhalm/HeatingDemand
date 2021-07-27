@@ -9,7 +9,8 @@ import pandas as pd
 from pvlib.solarposition import get_solarposition
 from pvlib.irradiance import get_total_irradiance
 
-from utilities import get_tmy_data
+import utilities
+#from utilities import get_tmy_data
 from physics import heatflow_transmission, heatflow_ventilation_infiltration, heatflow_solar_gains
 
 #%% COMFORT LEVELS 
@@ -49,13 +50,13 @@ windows = {
 # timezone information is needed for the calculation of sun angles by pvlib
 tz = 'Europe/Berlin' # maybe the timezone can be set according to lat, long
 
-#df = get_tmy_data(latitude=latitude, longitude=longitude)
-df = get_tmy_data(latitude=latitude, longitude=longitude)[['T2m','G(h)','Gb(n)','Gd(h)']]
-#print(df.head())
+#data = utilities.get_tmy_data(latitude=latitude, longitude=longitude)
+#utilities.save_tmy_data(data, f"TMY_lat{latitude}_lon{longitude}")
+df = utilities.read_tmy_data(filename=f"TMY_lat{latitude}_lon{longitude}")[['T2m','G(h)','Gb(n)','Gd(h)']]
+print(df.head())
 
 # temp_out = 10 # °C
 temp_ground = 8 # °C # some formula needed to calc ground temp, from ambient temp
-
 
 #%% TRANSMISSION LOSSES
 df_trans = pd.DataFrame() # create df for all the transmission heatflows
@@ -80,7 +81,7 @@ for wall, property in walls.items():
         )
     # Sum all transparent heatflows and save to main df
     df['Qdot_trans_opaque [W]'] += df_trans['Qdot_trans_' + wall + ' [W]']
-    
+
 # Transparent building elements (windows)
 df['Qdot_trans_windows [W]'] = 0 # create empty column in main df for sum of window trans heatflows
 for window, properties in windows.items():
