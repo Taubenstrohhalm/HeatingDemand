@@ -6,9 +6,11 @@ Created on Tue May 25 10:11:00 2021
 """
 
 import pandas as pd
+from pvlib.solarposition import get_solarposition
+from pvlib.irradiance import get_total_irradiance
 
 from utilities import get_tmy_data
-from physics import heatflow_transmission, heatflow_ventilation_infiltration
+from physics import heatflow_transmission, heatflow_ventilation_infiltration, heatflow_solar_gains
 
 #%% COMFORT LEVELS 
 
@@ -76,7 +78,9 @@ for wall, property in walls.items():
             temp_in = temp_in_low,
             temp_out = df['T2m'],
         )
+    # Sum all transparent heatflows and save to main df
     df['Qdot_trans_opaque [W]'] += df_trans['Qdot_trans_' + wall + ' [W]']
+    
 # Transparent building elements (windows)
 df['Qdot_trans_windows [W]'] = 0 # create empty column in main df for sum of window trans heatflows
 for window, properties in windows.items():
@@ -86,12 +90,11 @@ for window, properties in windows.items():
         temp_in=temp_in_low,
         temp_out=df['T2m'],
     )
+    # Sum all transmission heatflows through the windows and store in main df 
     df['Qdot_trans_windows [W]'] += df_trans['Qdot_trans_win_' + window + ' [W]']
 print(df_trans.head())
 
-
 #%% calculate heatflow due to infiltration and ventilation
-
 df['Qdot_vent [W]'] = heatflow_ventilation_infiltration(
     volume = volume,
     n_vent = n_ventilation,
@@ -99,39 +102,31 @@ df['Qdot_vent [W]'] = heatflow_ventilation_infiltration(
     temp_in = temp_in_low,
     temp_out = df['T2m']
 )
-
-
-print(df.head())
-'''
 # %% SOLAR GAINS
+df['Qdot_sol [W]'] = 0 # create empty column in main df for sum of solar gains
 
-# calculate solar angles
-from pvlib.solarposition import get_solarposition
-tz = 'Europe/Berlin'
-lat, lon = 48, 8 # latitude and longitude of the buildings location
-
-# this needs to be replaced by the index of the timeseries of our weather data
-# the index has to be in python datetime format
-times = pd.date_range('2019-01-01 00:00:00', '2020-01-01', closed='left',
-                      freq='H', tz=tz)
-
-solpos = get_solarposition(times, lat, lon)
-
-print(solpos.head())
+# create df for solargains and init with solarpositions 
+times = df.index
+df_sol = get_solarposition(df.index, latitude, longitude)
 
 # calculate total (beam + diffuse_sky + diffuse_ground) irradiation on windows
-from pvlib.irradiance import get_total_irradiance
+for window, properties in windows.items():
+    irradiation = get_total_irradiance(
+        surface_tilt = properties['tilt'],
+        surface_azimuth = properties['azimuth'],
+        solar_zenith = df_sol['zenith'],
+        solar_azimuth = df_sol['azimuth'],
+        dni = df['Gb(n)'],
+        ghi = df['G(h)'],
+        dhi = df['Gd(h)']
+    )
+    df_sol['Qdot_sol_gain_' + window + ' [W]'] = heatflow_solar_gains(
+        area = properties['area'],
+        irradiation = irradiation['poa_global'],
+        g_value = properties['g_value']
+    )
 
+    df['Qdot_sol [W]'] += df_sol['Qdot_sol_gain_' + window + ' [W]']
 
-# calculate solar gains
-def heatflow_solar_gains(area, irradiation, g_value):
-    Qdot = area * irradiation * g_value
-    return Qdot
-
-Qdot_sol = 0 # initialize heatflow due to solar gains [W]
-for window, property in windows.items():
-    Qdot_win = heatflow_solar_gains(property['area'], irradiation['window'], property['g_value'])
-    print(f'{window=}: {Qdot_win=}')
-
-
-'''
+print(df_sol.head())
+print(df.head())
