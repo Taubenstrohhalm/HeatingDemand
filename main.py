@@ -76,7 +76,8 @@ df_env[['Sun zenith [deg]','Sun azimuth [deg]']] = get_solarposition(df_env.inde
 
 print(df_env.head())
 
-'''
+df = pd.DataFrame(index = df_env.index)
+
 #%% TRANSMISSION LOSSES
 df_trans = pd.DataFrame() # create df for all the transmission heatflows
 df['Qdot_trans_opaque [W]'] = 0 # create empty column in main df for sum of opaque trans heatflows 
@@ -96,7 +97,7 @@ for wall, property in walls.items():
             u_value = property['u_value'],
             area = property['area'],
             temp_in = temp_in_low,
-            temp_out = df['T2m'],
+            temp_out = df_env['T_amb [°C]'],
         )
     # Sum all transparent heatflows and save to main df
     df['Qdot_trans_opaque [W]'] += df_trans['Qdot_trans_' + wall + ' [W]']
@@ -108,7 +109,7 @@ for window, properties in windows.items():
         u_value=properties['u_value'],
         area=properties['area'],
         temp_in=temp_in_low,
-        temp_out=df['T2m'],
+        temp_out=df_env['T_amb [°C]'],
     )
     # Sum all transmission heatflows through the windows and store in main df 
     df['Qdot_trans_windows [W]'] += df_trans['Qdot_trans_win_' + window + ' [W]']
@@ -120,13 +121,12 @@ df['Qdot_vent [W]'] = heatflow_ventilation_infiltration(
     n_vent = n_ventilation,
     n_inf = n_infiltration,
     temp_in = temp_in_low,
-    temp_out = df['T2m']
+    temp_out = df_env['T_amb [°C]']
 )
 # %% SOLAR GAINS
 df['Qdot_sol [W]'] = 0 # create empty column in main df for sum of solar gains
 
 # create df for solargains and init with solarpositions 
-times = df.index
 df_sol = get_solarposition(df.index, latitude, longitude)
 
 # calculate total (beam + diffuse_sky + diffuse_ground) irradiation on windows
@@ -136,9 +136,9 @@ for window, properties in windows.items():
         surface_azimuth = properties['azimuth'],
         solar_zenith = df_sol['zenith'],
         solar_azimuth = df_sol['azimuth'],
-        dni = df['Gb(n)'],
-        ghi = df['G(h)'],
-        dhi = df['Gd(h)']
+        dni = df_env['Gb(n) [W/m^2]'],
+        ghi = df_env['G(h) [W/m^2]'],
+        dhi = df_env['Gd(h) [W/m^2]']
     )
     df_sol['Qdot_sol_gain_' + window + ' [W]'] = heatflow_solar_gains(
         area = properties['area'],
@@ -150,4 +150,3 @@ for window, properties in windows.items():
 
 print(df_sol.head())
 print(df.head())
-'''
